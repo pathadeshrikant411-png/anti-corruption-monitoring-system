@@ -1,0 +1,35 @@
+# Node / Frontend Dependencies & Build Output
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+.npm/
+*.log
+
+# Python / Backend Virtual Envs & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Environment & Secret Files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+
+# Uploads & User Generated Files
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# IDE & System Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

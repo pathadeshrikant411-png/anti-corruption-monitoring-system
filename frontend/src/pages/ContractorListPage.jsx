@@ -10,7 +10,8 @@ import ContractorAvatar from '../components/ContractorAvatar';
 import {
   Users, Search, Filter, Plus, Eye, Edit3, CheckCircle, XCircle,
   Building, Phone, Mail, FileText, DollarSign, X, ShieldCheck, Download,
-  Upload, RefreshCw, AlertCircle, MapPin, Calendar, Tag, QrCode, Printer, Trash2, Camera
+  Upload, RefreshCw, AlertCircle, MapPin, Calendar, Tag, QrCode, Printer, Trash2, Camera,
+  Receipt, TrendingUp, Package
 } from 'lucide-react';
 
 const OFFICIAL_DOC_TYPES = [
@@ -207,11 +208,19 @@ const ContractorListPage = () => {
 
   const handleToggleStatus = async (contractorId, currentStatus) => {
     const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+    const confirmMsg = currentStatus === 'Active'
+      ? "Deactivating this contractor will suspend their login access.\n\nNOTE: All contractor profile details, assigned contracts, material bills, and documents are PERMANENTLY PRESERVED in the government ledger and cannot be deleted.\n\nProceed to mark as Inactive?"
+      : "Reactivate this contractor account for active project execution?";
+    if (!window.confirm(confirmMsg)) return;
     try {
       await api.put(`/contractors/${contractorId}/status`, { status: newStatus });
+      setToastMessage({
+        type: 'success',
+        text: `Contractor account marked as ${newStatus}. All records are permanently preserved.`
+      });
       fetchContractors();
     } catch (err) {
-      alert("Failed to update status.");
+      setToastMessage({ type: 'error', text: err.response?.data?.detail || "Failed to update contractor status." });
     }
   };
 
@@ -426,6 +435,24 @@ const ContractorListPage = () => {
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Create Contractor Profile</span>
             </button>
+          </div>
+
+          {/* Permanent Data Preservation & Anti-Deletion Safeguard Notice */}
+          <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200 flex items-start gap-3 text-xs">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-emerald-950 dark:text-emerald-100 uppercase tracking-wider text-[11px]">
+                  Permanent Contractor Ledger Safeguard
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-600 text-white">
+                  Zero Deletion Enforced ({contractors.length} Admin-Created Profiles Intact)
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                All contractor profiles registered by administration are permanently preserved in the government database for anti-corruption compliance. Deletion is strictly blocked. Deactivation is permitted to control portal credentials while preserving 100% of contracts, material purchase bills, and documents.
+              </p>
+            </div>
           </div>
 
           {/* Search & Filter Control Bar */}
@@ -793,6 +820,130 @@ const ContractorListPage = () => {
                             <RefreshCw className="w-3 h-3" /> Regenerate
                           </button>
                         </div>
+                      </div>
+
+                      {/* Material Purchase Bills Section */}
+                      <div className="space-y-2 pt-3 border-t border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                            <Receipt className="w-3.5 h-3.5 text-blue-600" />
+                            Material Purchase Bills & Invoices ({cnt.material_bills?.length || 0})
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Total Bills: ₹{(cnt.material_bills || []).reduce((acc, b) => acc + (b.amount || 0), 0).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {!cnt.material_bills || cnt.material_bills.length === 0 ? (
+                          <p className="text-[11px] text-slate-400 italic bg-white p-2.5 rounded border border-slate-200">
+                            No material purchase bills uploaded for this contract yet. Contractor uploads appear here and on the citizen QR page.
+                          </p>
+                        ) : (
+                          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs min-w-[500px]">
+                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[9px] border-b">
+                                  <tr>
+                                    <th className="py-2 px-3">Bill # & Date</th>
+                                    <th className="py-2 px-3">Supplier / Vendor</th>
+                                    <th className="py-2 px-3">Materials Description</th>
+                                    <th className="py-2 px-3">Amount</th>
+                                    <th className="py-2 px-3 text-right">Invoice</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                  {cnt.material_bills.map((bill) => (
+                                    <tr key={bill.id}>
+                                      <td className="py-2 px-3">
+                                        <span className="font-mono font-bold text-slate-800 block">{bill.bill_number}</span>
+                                        <span className="text-[10px] text-slate-400">{bill.bill_date}</span>
+                                      </td>
+                                      <td className="py-2 px-3 text-slate-700 font-medium">
+                                        {bill.supplier_name}
+                                      </td>
+                                      <td className="py-2 px-3 text-slate-600">
+                                        {bill.material_description}
+                                      </td>
+                                      <td className="py-2 px-3 font-mono font-bold text-blue-900">
+                                        ₹{(bill.amount || 0).toLocaleString()}
+                                      </td>
+                                      <td className="py-2 px-3 text-right">
+                                        {bill.bill_file_path && (
+                                          <a
+                                            href={bill.bill_file_path}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold rounded inline-flex items-center gap-1 transition-colors"
+                                          >
+                                            <Eye className="w-3 h-3" /> View Bill
+                                          </a>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Work Progress & Daily Updates Section */}
+                      <div className="space-y-2 pt-3 border-t border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                            Work Progress Updates & Logs ({cnt.work_updates?.length || 0})
+                          </span>
+                          <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            Current: {cnt.progress_percentage || 0}% Complete
+                          </span>
+                        </div>
+
+                        {!cnt.work_updates || cnt.work_updates.length === 0 ? (
+                          <p className="text-[11px] text-slate-400 italic bg-white p-2.5 rounded border border-slate-200">
+                            No dated progress logs logged yet by the contractor.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {cnt.work_updates.map((upd) => (
+                              <div key={upd.id} className="p-3 bg-white rounded-lg border border-slate-200 text-xs space-y-1">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-900">{upd.title}</span>
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                      {upd.status}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                                    <span className="font-mono">Date: {upd.work_date}</span>
+                                    <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                      {upd.progress_percentage}%
+                                    </span>
+                                  </div>
+                                </div>
+                                <p className="text-slate-600 text-[11px] leading-relaxed">{upd.description}</p>
+                                {upd.location_address && (
+                                  <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                                    <MapPin className="w-2.5 h-2.5 text-slate-400" /> {upd.location_address}
+                                  </p>
+                                )}
+                                {upd.photo_path && (
+                                  <div className="pt-1">
+                                    <a
+                                      href={upd.photo_path}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-[10px] font-semibold text-gov-700 hover:underline"
+                                    >
+                                      <Camera className="w-3 h-3" /> View Work Site Photo Evidence
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))

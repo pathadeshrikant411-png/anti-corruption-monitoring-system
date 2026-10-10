@@ -4,11 +4,13 @@ import AdminSidebar from '../components/AdminSidebar';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Link } from 'react-router-dom';
+import ContractorAvatar from '../components/ContractorAvatar';
 import {
   ShieldCheck, UserCheck, Calendar, Key, Lock, Layers,
   ArrowRight, Users, AlertTriangle, FileText, Globe, CheckCircle2,
   DollarSign, Activity, PieChart, BarChart3, TrendingUp, Sparkles,
-  Search, Eye, Clock, AlertCircle, ArrowUpRight, ChevronRight, CheckCircle, RefreshCw
+  Search, Eye, Clock, AlertCircle, ArrowUpRight, ChevronRight, CheckCircle, RefreshCw,
+  Building, Phone, Mail, MapPin, Receipt, X, Download, QrCode
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -24,6 +26,11 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [contractorsData, setContractorsData] = useState([]);
   const [complaintsData, setComplaintsData] = useState([]);
+
+  // Contractor Inspection Modal & Search
+  const [selectedContractor, setSelectedContractor] = useState(null);
+  const [isContractorModalOpen, setIsContractorModalOpen] = useState(false);
+  const [contractorSearch, setContractorSearch] = useState('');
 
   // Metrics
   const [metrics, setMetrics] = useState({
@@ -195,6 +202,20 @@ const DashboardPage = () => {
         minute: '2-digit',
       })
     : 'Active Session';
+
+  const filteredContractors = contractorsData.filter(c => {
+    if (!contractorSearch.trim()) return true;
+    const q = contractorSearch.toLowerCase();
+    const fullName = `${c.first_name || ''} ${c.fathers_name || ''} ${c.surname || ''}`.toLowerCase();
+    return (
+      fullName.includes(q) ||
+      (c.contractor_id || '').toLowerCase().includes(q) ||
+      (c.email || '').toLowerCase().includes(q) ||
+      (c.mobile_number || '').includes(q) ||
+      (c.contractor_reg_number || '').toLowerCase().includes(q) ||
+      (c.company_name || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className={`min-h-screen ${currentPreset.bgMain} ${currentPreset.textMain} flex flex-col font-sans transition-colors duration-300`}>
@@ -531,6 +552,141 @@ const DashboardPage = () => {
 
           </div>
 
+          {/* Admin Created Contractors & Transparency Ledger Section */}
+          <div className={`${currentPreset.bgCard} ${radiusClass} p-6 border ${currentPreset.border} shadow-sm space-y-4`}>
+            {/* Section Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                    <Users className="w-4 h-4 text-gov-700" />
+                    Admin Created Contractors & Permanent Transparency Directory
+                  </h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                    {contractorsData.length} Permanent Profiles (Zero Deletion)
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Full ledger of all contractors created by admin. Deletion is permanently blocked; all profiles, contracts, and bills are preserved.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    value={contractorSearch}
+                    onChange={(e) => setContractorSearch(e.target.value)}
+                    placeholder="Search contractor name, ID, email..."
+                    className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gov-500 w-48 sm:w-64"
+                  />
+                </div>
+                <Link
+                  to="/admin/contractors"
+                  className="px-3 py-1.5 bg-gov-700 hover:bg-gov-800 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center gap-1 shrink-0"
+                >
+                  Manage Directory <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Contractors Table */}
+            {filteredContractors.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs italic bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                {contractorSearch ? "No contractor matches your search query." : "No contractors registered yet."}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[700px]">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] border-b border-slate-200 dark:border-slate-700">
+                    <tr>
+                      <th className="py-2.5 px-3">Contractor Profile</th>
+                      <th className="py-2.5 px-3">Company & Reg #</th>
+                      <th className="py-2.5 px-3">Contact Information</th>
+                      <th className="py-2.5 px-3">Assigned Works & Bills</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredContractors.map((ctr) => {
+                      const totalContractValue = (ctr.contracts || []).reduce((acc, c) => {
+                        return acc + (c.financials?.contract_value || c.financials?.sanctioned_amount || 0);
+                      }, 0);
+                      const totalBills = (ctr.contracts || []).reduce((acc, c) => acc + (c.material_bills?.length || 0), 0);
+
+                      return (
+                        <tr key={ctr.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-2.5">
+                              <ContractorAvatar
+                                photoPath={ctr.photo_path}
+                                firstName={ctr.first_name}
+                                surname={ctr.surname}
+                                size="sm"
+                              />
+                              <div>
+                                <span className="font-bold text-slate-900 dark:text-white block">
+                                  {ctr.first_name} {ctr.fathers_name ? `${ctr.fathers_name} ` : ''}{ctr.surname}
+                                </span>
+                                <span className="font-mono text-[10px] text-slate-400 block">{ctr.contractor_id}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 block">
+                              {ctr.company_name || 'Individual Contractor'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">Reg: {ctr.contractor_reg_number}</span>
+                          </td>
+                          <td className="py-3 px-3 text-slate-600 dark:text-slate-400">
+                            <div className="space-y-0.5">
+                              <span className="block flex items-center gap-1 text-[11px]">
+                                <Mail className="w-3 h-3 text-slate-400" /> {ctr.email}
+                              </span>
+                              <span className="block flex items-center gap-1 text-[11px] font-mono">
+                                <Phone className="w-3 h-3 text-slate-400" /> {ctr.mobile_number}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-bold text-slate-900 dark:text-white block">
+                              {ctr.contracts?.length || 0} Work Orders
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              Val: {formatCurrency(totalContractValue)} {totalBills > 0 && `• ${totalBills} Material Bills`}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              ctr.status === 'Active'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200'
+                                : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                            }`}>
+                              {ctr.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <button
+                              onClick={() => {
+                                setSelectedContractor(ctr);
+                                setIsContractorModalOpen(true);
+                              }}
+                              className="px-2.5 py-1.5 bg-gov-700 hover:bg-gov-800 text-white rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" /> Inspect Details
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* Quick Action Operations & Citizen Complaints Live Feed */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
@@ -696,6 +852,289 @@ const DashboardPage = () => {
             </div>
 
           </div>
+
+          {/* Contractor Full Details Inspection Modal */}
+          {isContractorModalOpen && selectedContractor && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-200 dark:border-slate-800 overflow-hidden my-auto text-slate-800 dark:text-slate-100">
+                {/* Modal Header */}
+                <div className="bg-slate-900 text-white p-5 flex items-center justify-between shrink-0 border-b border-slate-800">
+                  <div className="flex items-center space-x-3.5 min-w-0">
+                    <ContractorAvatar
+                      photoPath={selectedContractor.photo_path}
+                      firstName={selectedContractor.first_name}
+                      surname={selectedContractor.surname}
+                      size="md"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-extrabold text-base text-white truncate">
+                          {selectedContractor.first_name} {selectedContractor.fathers_name ? `${selectedContractor.fathers_name} ` : ''}{selectedContractor.surname}
+                        </h3>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          selectedContractor.status === 'Active' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-700 text-slate-300'
+                        }`}>
+                          {selectedContractor.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 font-mono">
+                        ID: {selectedContractor.contractor_id} • Reg: {selectedContractor.contractor_reg_number}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setIsContractorModalOpen(false)}
+                    className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Modal Body - Scrollable */}
+                <div className="p-6 overflow-y-auto space-y-6 text-xs flex-1">
+                  
+                  {/* Permanent Retention Notice */}
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-800 dark:text-emerald-300 flex items-center gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-medium text-[11px]">
+                      <strong>Permanent Government Record:</strong> This contractor profile was created by the administration and is permanently protected against deletion. All past and ongoing contracts, financial disbursements, and material bills remain intact.
+                    </span>
+                  </div>
+
+                  {/* Personal & Business Dossier */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Personal & Contact Details */}
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/70 space-y-2">
+                      <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <UserCheck className="w-3.5 h-3.5 text-gov-600" /> Personal & Account Information
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Full Name</span>
+                          <span className="font-semibold">{selectedContractor.first_name} {selectedContractor.fathers_name} {selectedContractor.surname}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Father's Name</span>
+                          <span className="font-medium">{selectedContractor.fathers_name || 'N/A'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Email Address</span>
+                          <span className="font-medium">{selectedContractor.email}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Mobile Number</span>
+                          <span className="font-mono font-medium">{selectedContractor.mobile_number}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Business Registration */}
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/70 space-y-2">
+                      <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Building className="w-3.5 h-3.5 text-gov-600" /> Business & Accreditation
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Company / Enterprise</span>
+                          <span className="font-semibold">{selectedContractor.company_name || 'Individual Contractor'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Govt Reg Number</span>
+                          <span className="font-mono font-semibold">{selectedContractor.contractor_reg_number}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Business Address</span>
+                          <span className="font-medium">{selectedContractor.business_address}, {selectedContractor.district}, {selectedContractor.state} - {selectedContractor.pin_code}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Assigned Government Contracts Section */}
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+                      <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-gov-600" /> Assigned Government Contracts & Projects ({selectedContractor.contracts?.length || 0})
+                      </h4>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Total Contracts: {selectedContractor.contracts?.length || 0}
+                      </span>
+                    </div>
+
+                    {!selectedContractor.contracts || selectedContractor.contracts.length === 0 ? (
+                      <div className="p-6 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-center text-slate-400">
+                        No contracts currently assigned to this contractor profile.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {selectedContractor.contracts.map((cnt) => (
+                          <div key={cnt.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-700/60 pb-2.5">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-extrabold text-sm text-slate-900 dark:text-white">{cnt.title}</span>
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
+                                    {cnt.status}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  ID: {cnt.contract_id} • Dept: {cnt.department} • Office: {cnt.office_name}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {cnt.qr_code_token && (
+                                  <button
+                                    onClick={() => window.open(`/public/project/${cnt.qr_code_token || cnt.contract_id}`, '_blank')}
+                                    className="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-bold inline-flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                                  >
+                                    <QrCode className="w-3 h-3" /> Public QR View
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Location & Financials */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                              <div className="p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                <span className="text-slate-400 block text-[9px] uppercase font-bold">Contract Value</span>
+                                <span className="font-bold font-mono text-blue-900 dark:text-blue-300">
+                                  ₹{(cnt.financials?.contract_value || 0).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                              <div className="p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                <span className="text-slate-400 block text-[9px] uppercase font-bold">Sanctioned Budget</span>
+                                <span className="font-bold font-mono text-emerald-900 dark:text-emerald-300">
+                                  ₹{(cnt.financials?.sanctioned_amount || 0).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                              <div className="p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                <span className="text-slate-400 block text-[9px] uppercase font-bold">Physical Progress</span>
+                                <span className="font-bold text-slate-900 dark:text-white">
+                                  {cnt.progress_percentage || 0}% Complete
+                                </span>
+                              </div>
+                              <div className="p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                <span className="text-slate-400 block text-[9px] uppercase font-bold">Timeline</span>
+                                <span className="font-medium text-[10px]">
+                                  {cnt.start_date} to {cnt.end_date}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Material Purchase Bills */}
+                            <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1">
+                                  <Receipt className="w-3.5 h-3.5 text-blue-600" /> Material Bills ({cnt.material_bills?.length || 0})
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  Total: ₹{(cnt.material_bills || []).reduce((acc, b) => acc + (b.amount || 0), 0).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+
+                              {!cnt.material_bills || cnt.material_bills.length === 0 ? (
+                                <p className="text-[11px] text-slate-400 italic bg-white dark:bg-slate-800 p-2.5 rounded border border-slate-200 dark:border-slate-700">
+                                  No material purchase bills uploaded for this contract yet.
+                                </p>
+                              ) : (
+                                <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs min-w-[500px]">
+                                      <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 font-bold uppercase text-[9px] border-b">
+                                        <tr>
+                                          <th className="py-2 px-3">Bill # & Date</th>
+                                          <th className="py-2 px-3">Supplier / Vendor</th>
+                                          <th className="py-2 px-3">Material Description</th>
+                                          <th className="py-2 px-3">Amount</th>
+                                          <th className="py-2 px-3 text-right">Invoice</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                        {cnt.material_bills.map((bill) => (
+                                          <tr key={bill.id}>
+                                            <td className="py-2 px-3">
+                                              <span className="font-mono font-bold text-slate-900 dark:text-white block">{bill.bill_number}</span>
+                                              <span className="text-[10px] text-slate-400">{bill.bill_date}</span>
+                                            </td>
+                                            <td className="py-2 px-3 text-slate-700 dark:text-slate-300 font-medium">
+                                              {bill.supplier_name}
+                                            </td>
+                                            <td className="py-2 px-3 text-slate-600 dark:text-slate-400">
+                                              {bill.material_description}
+                                            </td>
+                                            <td className="py-2 px-3 font-mono font-bold text-blue-900 dark:text-blue-300">
+                                              ₹{(bill.amount || 0).toLocaleString('en-IN')}
+                                            </td>
+                                            <td className="py-2 px-3 text-right">
+                                              {bill.bill_file_path && (
+                                                <a
+                                                  href={bill.bill_file_path}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="px-2 py-1 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] font-bold rounded inline-flex items-center gap-1"
+                                                >
+                                                  <Eye className="w-3 h-3" /> View Bill
+                                                </a>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Work Progress Updates */}
+                            {cnt.work_updates && cnt.work_updates.length > 0 && (
+                              <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                                <span className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1">
+                                  <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> Work Progress Logs ({cnt.work_updates.length})
+                                </span>
+                                <div className="space-y-2">
+                                  {cnt.work_updates.map((upd) => (
+                                    <div key={upd.id} className="p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-bold text-slate-900 dark:text-white">{upd.title}</span>
+                                        <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold font-mono">
+                                          {upd.progress_percentage}% • {upd.work_date}
+                                        </span>
+                                      </div>
+                                      <p className="text-slate-600 dark:text-slate-400 text-[11px] mt-1">{upd.description}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* Modal Footer */}
+                <div className="bg-slate-50 dark:bg-slate-800/80 p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                  <Link
+                    to="/admin/contractors"
+                    className="text-xs text-gov-700 dark:text-gov-400 font-bold hover:underline flex items-center gap-1"
+                  >
+                    Open in Contractor Directory & Document Manager <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                  <button
+                    onClick={() => setIsContractorModalOpen(false)}
+                    className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                  >
+                    Close Inspector
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
         </main>
       </div>

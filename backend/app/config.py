@@ -9,7 +9,7 @@ load_dotenv()
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Anti Curruption Monitoring System"
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/anti_corruption_db")
-    SQLITE_FALLBACK_URL: str = "sqlite:///./sql_app.db"
+    SQLITE_FALLBACK_URL: str = f"sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'sql_app.db')).replace('\\', '/')}"
     
     SECRET_KEY: str = os.getenv("SECRET_KEY", "default_super_secret_key_change_in_production_2026")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")

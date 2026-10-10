@@ -458,6 +458,18 @@ def get_contractor_details(
         raise HTTPException(status_code=404, detail="Contractor not found.")
     return ContractorResponse.model_validate(contractor)
 
+@router.delete("/{contractor_id}")
+def delete_contractor_forbidden(
+    contractor_id: str,
+    db: Session = Depends(get_db),
+    admin = Depends(get_current_admin)
+):
+    """Enforce strict data preservation: Contractors created by admin cannot be deleted."""
+    raise HTTPException(
+        status_code=403,
+        detail="Permanent Governance Policy: Contractor profiles created by administration cannot be deleted. Deactivation is permitted to manage account access while preserving complete contract and audit records."
+    )
+
 @router.put("/{contractor_id}/status")
 def update_contractor_status(
     contractor_id: int,

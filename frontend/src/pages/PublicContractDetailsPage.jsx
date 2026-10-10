@@ -8,7 +8,7 @@ import ContractorAvatar from '../components/ContractorAvatar';
 import {
   ShieldCheck, Building, MapPin, Calendar, FileText, DollarSign,
   Award, CheckCircle2, Download, Eye, AlertTriangle, Printer, Share2,
-  ExternalLink, Layers, CheckCircle, Clock
+  ExternalLink, Layers, CheckCircle, Clock, Receipt, FileSpreadsheet
 } from 'lucide-react';
 
 const PublicContractDetailsPage = () => {
@@ -701,6 +701,74 @@ const PublicContractDetailsPage = () => {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Official Material Purchase Bills & Vouchers (Public Citizen Transparency) */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-emerald-600" />
+                🧾 Material Purchase Bills & Supplier Invoices ({contractData.material_bills?.length || 0})
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Authentic material purchase invoices and supplier receipts permanently uploaded by the contractor for citizen audit.
+              </p>
+            </div>
+            {contractData.material_bills?.length > 0 && (
+              <span className="hidden sm:inline-flex items-center px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200">
+                <ShieldCheck className="w-3.5 h-3.5 mr-1 text-emerald-600" /> Verified Audit Records
+              </span>
+            )}
+          </div>
+
+          {!contractData.material_bills || contractData.material_bills.length === 0 ? (
+            <div className="p-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center space-y-1">
+              <Receipt className="w-8 h-8 text-slate-300 mx-auto" />
+              <p className="text-xs font-semibold text-slate-600">No material purchase bills uploaded yet for this contract.</p>
+              <p className="text-[11px] text-slate-400">Supplier invoices and bills uploaded by the contractor will be permanently displayed here.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 font-extrabold uppercase tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3">Bill / Invoice #</th>
+                    <th className="py-2.5 px-3">Supplier Name</th>
+                    <th className="py-2.5 px-3">Material Description</th>
+                    <th className="py-2.5 px-3 text-right">Amount (₹)</th>
+                    <th className="py-2.5 px-3 text-center">Receipt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {contractData.material_bills.map((bill) => (
+                    <tr key={bill.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2.5 px-3 font-mono text-slate-700 whitespace-nowrap">{bill.bill_date}</td>
+                      <td className="py-2.5 px-3 font-bold text-slate-900 font-mono whitespace-nowrap">{bill.bill_number}</td>
+                      <td className="py-2.5 px-3 text-slate-800 font-semibold">{bill.supplier_name}</td>
+                      <td className="py-2.5 px-3 text-slate-600 max-w-xs truncate" title={bill.material_description}>
+                        {bill.material_description}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-extrabold text-emerald-700 whitespace-nowrap">
+                        ₹{Number(bill.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                        <a
+                          href={bill.bill_file_path}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-bold text-[11px] transition-colors border border-emerald-200"
+                        >
+                          <ExternalLink className="w-3 h-3" /> View Bill
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

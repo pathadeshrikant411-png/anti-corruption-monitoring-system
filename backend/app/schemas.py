@@ -233,6 +233,23 @@ class WorkUpdateResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class MaterialBillResponse(BaseModel):
+    id: int
+    contract_id: int
+    bill_number: str
+    supplier_name: str
+    material_description: str
+    amount: float
+    bill_date: str
+    bill_file_path: str
+    file_name: Optional[str] = None
+    file_size: Optional[int] = None
+    mime_type: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class ContractResponse(BaseModel):
     id: int
     contract_id: str
@@ -260,6 +277,7 @@ class ContractResponse(BaseModel):
     financials: Optional[ContractFinancialResponse] = None
     documents: List[DocumentResponse] = []
     work_updates: List[WorkUpdateResponse] = []
+    material_bills: List[MaterialBillResponse] = []
 
     class Config:
         from_attributes = True
@@ -297,6 +315,7 @@ class PublicContractDetailsResponse(BaseModel):
     financials: Optional[ContractFinancialResponse] = None
     verified_documents: List[DocumentResponse] = []
     work_updates: List[WorkUpdateResponse] = []
+    material_bills: List[MaterialBillResponse] = []
 
 class ContractorResponse(BaseModel):
     id: int

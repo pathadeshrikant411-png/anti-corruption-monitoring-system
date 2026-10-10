@@ -8,7 +8,8 @@ import api from '../services/api';
 import ContractorAvatar from '../components/ContractorAvatar';
 import {
   UserCheck, Building, FileText, Download, ShieldCheck, Lock,
-  DollarSign, CheckCircle2, AlertCircle, KeyRound, Calendar
+  DollarSign, CheckCircle2, AlertCircle, KeyRound, Calendar,
+  Receipt, UploadCloud, ExternalLink, FileSpreadsheet
 } from 'lucide-react';
 
 const ContractorDashboardPage = () => {
@@ -30,6 +31,16 @@ const ContractorDashboardPage = () => {
   const [updateLocationAddress, setUpdateLocationAddress] = useState('');
   const [isSubmittingWorkUpdate, setIsSubmittingWorkUpdate] = useState(false);
   const [workUpdateMsg, setWorkUpdateMsg] = useState(null);
+
+  // Material Bills State
+  const [billNumber, setBillNumber] = useState('');
+  const [supplierName, setSupplierName] = useState('');
+  const [materialDescription, setMaterialDescription] = useState('');
+  const [billAmount, setBillAmount] = useState('');
+  const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
+  const [billFile, setBillFile] = useState(null);
+  const [isSubmittingBill, setIsSubmittingBill] = useState(false);
+  const [billMsg, setBillMsg] = useState(null);
 
   // Password Change Modal State
   const [mustChangePassword, setMustChangePassword] = useState(false);
@@ -93,6 +104,53 @@ const ContractorDashboardPage = () => {
       setWorkUpdateMsg({ type: 'error', text: err.response?.data?.detail || "Failed to post work update." });
     } finally {
       setIsSubmittingWorkUpdate(false);
+    }
+  };
+
+  const handleMaterialBillSubmit = async (e) => {
+    e.preventDefault();
+    const contractId = Number(selectedContractIdForUpdate) || contracts[0]?.id;
+    if (!contractId) {
+      setBillMsg({ type: 'error', text: 'Please select an assigned contract first.' });
+      return;
+    }
+    if (!billNumber || !supplierName || !materialDescription || !billAmount || !billFile) {
+      setBillMsg({ type: 'error', text: 'Please complete all required fields and select the bill document file.' });
+      return;
+    }
+
+    setIsSubmittingBill(true);
+    setBillMsg(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('bill_number', billNumber.trim());
+      formData.append('supplier_name', supplierName.trim());
+      formData.append('material_description', materialDescription.trim());
+      formData.append('amount', billAmount);
+      formData.append('bill_date', billDate);
+      formData.append('file', billFile);
+
+      await api.post(`/contractor/contracts/${contractId}/material-bills`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setBillMsg({ type: 'success', text: `✅ Material bill #${billNumber} successfully uploaded and permanently saved in database!` });
+      setBillNumber('');
+      setSupplierName('');
+      setMaterialDescription('');
+      setBillAmount('');
+      setBillFile(null);
+
+      // Refresh dashboard data so the bill appears in logs immediately
+      await fetchDashboardData();
+    } catch (err) {
+      setBillMsg({
+        type: 'error',
+        text: err.response?.data?.detail || 'Failed to upload material bill. Please verify file format and size.'
+      });
+    } finally {
+      setIsSubmittingBill(false);
     }
   };
 
@@ -534,6 +592,223 @@ const ContractorDashboardPage = () => {
                         )}
                       </div>
                     ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* MATERIAL BILLS UPLOAD & PERMANENT LOGS (Permanent Transparency) */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <div className="border-b border-slate-100 pb-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <Receipt className="w-4.5 h-4.5 text-emerald-600" />
+                    Upload Material Purchase Bills & Invoices
+                  </h2>
+                  <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-lg border border-emerald-200 flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    Permanent Public Record
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Upload authentic purchase bills, supplier invoices, and delivery challans for cement, steel, bricks, aggregate, etc.
+                  These bills are permanently preserved in the database and visible to citizens when they scan the project QR code.
+                </p>
+              </div>
+
+              {billMsg && (
+                <NotificationToast
+                  type={billMsg.type}
+                  message={billMsg.text}
+                  onClose={() => setBillMsg(null)}
+                />
+              )}
+
+              {contracts.length === 0 ? (
+                <p className="text-xs text-slate-400 py-3">No assigned contracts available to attach material bills.</p>
+              ) : (
+                <form onSubmit={handleMaterialBillSubmit} className="space-y-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Invoice / Bill Number */}
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Bill / Invoice Number *</label>
+                      <input
+                        type="text"
+                        required
+                        value={billNumber}
+                        onChange={(e) => setBillNumber(e.target.value)}
+                        placeholder="e.g. INV-2026/0842"
+                        className="w-full p-2.5 border border-slate-300 rounded-xl font-mono text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    {/* Supplier Name */}
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Supplier / Vendor Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={supplierName}
+                        onChange={(e) => setSupplierName(e.target.value)}
+                        placeholder="e.g. UltraTech Cement Agency / Shri Ram Steels"
+                        className="w-full p-2.5 border border-slate-300 rounded-xl font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    {/* Bill Date */}
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Invoice / Purchase Date *</label>
+                      <input
+                        type="date"
+                        required
+                        value={billDate}
+                        onChange={(e) => setBillDate(e.target.value)}
+                        className="w-full p-2.5 border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Material Description */}
+                    <div className="sm:col-span-2">
+                      <label className="block font-bold text-slate-800 mb-1">Material Description & Quantity *</label>
+                      <input
+                        type="text"
+                        required
+                        value={materialDescription}
+                        onChange={(e) => setMaterialDescription(e.target.value)}
+                        placeholder="e.g. 500 Bags OPC 53 Grade Cement + 12 MT TMT Steel Rebars Fe500D"
+                        className="w-full p-2.5 border border-slate-300 rounded-xl font-medium focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    {/* Total Amount */}
+                    <div>
+                      <label className="block font-bold text-slate-800 mb-1">Total Bill Amount (₹) *</label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          required
+                          value={billAmount}
+                          onChange={(e) => setBillAmount(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full pl-8 pr-3 py-2.5 border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bill File Upload */}
+                  <div>
+                    <label className="block font-bold text-slate-800 mb-1">
+                      Upload Bill Document / Tax Invoice (PDF, JPG, PNG) *
+                    </label>
+                    <div className="p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl flex items-center justify-between gap-3">
+                      <input
+                        type="file"
+                        required
+                        accept=".pdf,image/*"
+                        onChange={(e) => setBillFile(e.target.files[0] || null)}
+                        className="w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white file:cursor-pointer hover:file:bg-emerald-700"
+                      />
+                      {billFile && (
+                        <span className="text-[11px] font-bold text-emerald-700 whitespace-nowrap bg-emerald-100 px-2.5 py-1 rounded-lg">
+                          Ready to upload
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      disabled={isSubmittingBill || !billNumber || !supplierName || !billAmount || !billFile}
+                      className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmittingBill ? (
+                        <LoadingSpinner size="sm" text="Uploading Bill to Permanent Record..." />
+                      ) : (
+                        <>
+                          <UploadCloud className="w-4 h-4" /> Save Material Bill Permanently
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* PERMANENT MATERIAL BILLS LOGS TABLE */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  Permanent Material Bills & Invoices Archive
+                </h3>
+                <span className="text-xs text-slate-500 font-semibold">
+                  {(() => {
+                    const activeContract = contracts.find(c => c.id === Number(selectedContractIdForUpdate)) || contracts[0];
+                    return `Total: ${(activeContract?.material_bills || []).length} Bills`;
+                  })()}
+                </span>
+              </div>
+
+              {(() => {
+                const activeContract = contracts.find(c => c.id === Number(selectedContractIdForUpdate)) || contracts[0];
+                const bills = activeContract?.material_bills || [];
+
+                if (bills.length === 0) {
+                  return (
+                    <div className="p-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center space-y-1 text-xs text-slate-500">
+                      <Receipt className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="font-semibold">No material bills uploaded yet for {activeContract?.title || 'this contract'}.</p>
+                      <p className="text-[11px] text-slate-400">Use the form above to record supplier bills. They will remain permanently accessible to the public upon QR scanning.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-600 font-extrabold uppercase tracking-wider border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-3">Date</th>
+                          <th className="py-2.5 px-3">Bill / Invoice #</th>
+                          <th className="py-2.5 px-3">Supplier Name</th>
+                          <th className="py-2.5 px-3">Material Description</th>
+                          <th className="py-2.5 px-3 text-right">Amount (₹)</th>
+                          <th className="py-2.5 px-3 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {bills.map((b) => (
+                          <tr key={b.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-2.5 px-3 font-mono text-slate-700 whitespace-nowrap">{b.bill_date}</td>
+                            <td className="py-2.5 px-3 font-bold text-slate-900 font-mono whitespace-nowrap">{b.bill_number}</td>
+                            <td className="py-2.5 px-3 text-slate-800 font-semibold">{b.supplier_name}</td>
+                            <td className="py-2.5 px-3 text-slate-600 max-w-xs truncate" title={b.material_description}>
+                              {b.material_description}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-extrabold text-emerald-700 whitespace-nowrap">
+                              ₹{Number(b.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                              <a
+                                href={b.bill_file_path}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-bold text-[11px] transition-colors border border-emerald-200"
+                              >
+                                <ExternalLink className="w-3 h-3" /> View Bill
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 );
               })()}

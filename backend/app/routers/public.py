@@ -1,19 +1,21 @@
 import io
 import os
+import mimetypes
 import qrcode
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Contract, Contractor, ContractDocument, Complaint, ComplaintPhoto, SystemSetting, WorkUpdate
+from app.models import Contract, Contractor, ContractDocument, Complaint, ComplaintPhoto, SystemSetting, WorkUpdate, MaterialBill
 from app.config import settings
 from app.schemas import (
     PublicContractDetailsResponse,
     PublicContractorSummary,
     ContractFinancialResponse,
     DocumentResponse,
-    WorkUpdateResponse
+    WorkUpdateResponse,
+    MaterialBillResponse
 )
 
 router = APIRouter(prefix="/api/public", tags=["Public Contract Transparency"])
@@ -69,6 +71,12 @@ def get_public_contract_by_qr(
     ).order_by(WorkUpdate.work_date.desc(), WorkUpdate.created_at.desc()).all()
     work_updates = [WorkUpdateResponse.model_validate(w) for w in work_updates_list]
 
+    # Fetch material purchase bills uploaded by contractor for this contract
+    material_bills_list = db.query(MaterialBill).filter(
+        MaterialBill.contract_id == contract.id
+    ).order_by(MaterialBill.bill_date.desc(), MaterialBill.created_at.desc()).all()
+    material_bills = [MaterialBillResponse.model_validate(b) for b in material_bills_list]
+
     return PublicContractDetailsResponse(
         contract_id=contract.contract_id,
         qr_code_token=contract.qr_code_token or contract.contract_id,
@@ -94,7 +102,8 @@ def get_public_contract_by_qr(
         contractor=contractor_summary,
         financials=fin_resp,
         verified_documents=verified_docs,
-        work_updates=work_updates
+        work_updates=work_updates,
+        material_bills=material_bills
     )
 
 import socket
@@ -441,6 +450,21 @@ def serve_contractor_photo(filename: str):
         raise HTTPException(status_code=404, detail="Contractor photo not found.")
     guessed_type, _ = mimetypes.guess_type(file_path)
     mime_type = guessed_type or "image/jpeg"
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=86400"
+    }
+    return FileResponse(file_path, media_type=mime_type, headers=headers)
+
+@router.get("/uploads/material_bills/{filename}")
+def serve_material_bill(filename: str):
+    """Public Endpoint: Serve material purchase bills & receipts safely for citizens."""
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(settings.UPLOAD_DIR, "material_bills", safe_filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Material bill file not found.")
+    guessed_type, _ = mimetypes.guess_type(file_path)
+    mime_type = guessed_type or "application/pdf"
     headers = {
         "Access-Control-Allow-Origin": "*",
         "Cache-Control": "public, max-age=86400"

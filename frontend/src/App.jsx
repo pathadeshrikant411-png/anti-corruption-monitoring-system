@@ -12,14 +12,29 @@ import ContractorDashboardPage from './pages/ContractorDashboardPage';
 import PublicContractDetailsPage from './pages/PublicContractDetailsPage';
 import CitizenComplaintsPage from './pages/CitizenComplaintsPage';
 
-// Smart Home Redirect based on logged-in user role
+// Smart Home Redirect based on independently verified user role
 const SmartHomeRedirect = () => {
-  const { user, isAuthenticated, isLoading } = useAuth();
-  if (isLoading) return null;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  const isContractorUser = user?.user_type === 'contractor' || user?.role === 'contractor';
-  if (isContractorUser) return <Navigate to="/contractor/dashboard" replace />;
-  return <Navigate to="/dashboard" replace />;
+  const {
+    isAdminLoading,
+    isAdminAuthenticated,
+    isContractorLoading,
+    isContractorAuthenticated,
+  } = useAuth();
+
+  if (isAdminLoading || isContractorLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-gov-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-sm font-semibold text-slate-300">Loading Anti Corruption Transparency System...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAdminAuthenticated) return <Navigate to="/dashboard" replace />;
+  if (isContractorAuthenticated) return <Navigate to="/contractor/dashboard" replace />;
+  return <Navigate to="/login" replace />;
 };
 
 function App() {

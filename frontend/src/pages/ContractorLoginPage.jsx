@@ -1,42 +1,74 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Landmark, Lock, Mail, Eye, EyeOff, ShieldAlert, ArrowRight, Building2 } from 'lucide-react';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
+import { Landmark, Lock, Mail, Eye, EyeOff, ShieldAlert, ArrowRight, Building2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import NotificationToast from '../components/NotificationToast';
 import LoadingSpinner from '../components/LoadingSpinner';
-import api from '../services/api';
 
 const ContractorLoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verifySuccess, setVerifySuccess] = useState(false);
 
-  const { login } = useAuth();
+  const {
+    loginContractor,
+    isContractorAuthenticated,
+    isContractorLoading,
+    contractorError,
+    clearError
+  } = useAuth();
+
   const navigate = useNavigate();
+
+  // If already authenticated as contractor, seamlessly navigate to contractor dashboard
+  if (!isContractorLoading && isContractorAuthenticated && !isSubmitting) {
+    return <Navigate to="/contractor/dashboard" replace />;
+  }
 
   const handleContractorLoginSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) return;
 
-    setIsLoading(true);
-    setErrorMsg(null);
+    setIsSubmitting(true);
+    setVerifySuccess(false);
 
-    const result = await login(email, password, true);
-    setIsLoading(false);
-
-    if (result.success) {
-      navigate('/contractor/dashboard');
+    const result = await loginContractor(email, password);
+    if (result.success && result.user_type === 'contractor') {
+      setVerifySuccess(true);
+      setTimeout(() => {
+        navigate('/contractor/dashboard', { replace: true });
+      }, 400);
     } else {
-      setErrorMsg(
-        result.error || 'Unable to authenticate. Please check your contractor credentials.'
-      );
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col justify-between selection:bg-emerald-600 selection:text-white relative overflow-hidden">
+      {/* Fullscreen verification overlay during login redirect */}
+      {isSubmitting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl p-6 sm:p-8 max-w-sm w-full mx-4 shadow-2xl flex flex-col items-center text-center animate-fadeIn">
+            <div className="p-3 bg-emerald-600/20 text-emerald-400 rounded-2xl mb-4 border border-emerald-500/30">
+              {verifySuccess ? (
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 animate-bounce" />
+              ) : (
+                <Building2 className="w-8 h-8 animate-pulse text-emerald-400" />
+              )}
+            </div>
+            <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <h3 className="text-base font-bold text-white mb-1">
+              {verifySuccess ? 'Contractor Verified' : 'Verifying Contractor Credentials'}
+            </h3>
+            <p className="text-xs text-slate-300">
+              {verifySuccess ? 'Redirecting to Contractor Portal...' : 'Validating Government Contract Allocations...'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Clean gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-100 via-emerald-50/20 to-slate-200 pointer-events-none"></div>
 
@@ -78,7 +110,7 @@ const ContractorLoginPage = () => {
                   <Building2 className="w-8 h-8" />
                 </div>
                 <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                  Contractor Portal Login
+                  Contractor Login
                 </h2>
                 <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">
                   Access Assigned Government Contracts & Financial Details
@@ -86,13 +118,25 @@ const ContractorLoginPage = () => {
               </div>
 
               {/* Notification Toast for Errors */}
-              {errorMsg && (
+              {contractorError && (
                 <div className="mb-5">
                   <NotificationToast
                     type="error"
-                    message={errorMsg}
-                    onClose={() => setErrorMsg(null)}
+                    message={contractorError}
+                    onClose={clearError}
                   />
+                  {contractorError.toLowerCase().includes('admin') && (
+                    <div className="mt-2 p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                      <p className="text-xs text-blue-800 mb-1.5 font-medium">Looking for the Admin Portal?</p>
+                      <Link
+                        to="/login"
+                        className="inline-flex items-center justify-center px-3 py-1.5 bg-gov-700 hover:bg-gov-800 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
+                      >
+                        <Landmark className="w-3.5 h-3.5 mr-1.5" />
+                        Go to Admin Login
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -128,7 +172,7 @@ const ContractorLoginPage = () => {
                     htmlFor="contractor-password"
                     className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
                   >
-                    Password
+                    Contractor Password
                   </label>
                   <div className="relative rounded-lg shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -147,6 +191,7 @@ const ContractorLoginPage = () => {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                      title={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4" />
@@ -160,14 +205,14 @@ const ContractorLoginPage = () => {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={isLoading || !email || !password}
+                  disabled={isSubmitting || !email || !password}
                   className="w-full mt-2 py-3 px-4 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white font-semibold text-sm rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
                 >
-                  {isLoading ? (
+                  {isSubmitting ? (
                     <LoadingSpinner size="sm" text="Authenticating Contractor..." />
                   ) : (
                     <>
-                      <span>Sign In to Contractor Portal</span>
+                      <span>Sign In to Contractor Dashboard</span>
                       <ArrowRight className="w-4 h-4 ml-1" />
                     </>
                   )}

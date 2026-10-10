@@ -85,6 +85,7 @@ class Contractor(Base):
     contracts = relationship("Contract", back_populates="contractor", cascade="all, delete-orphan")
     documents = relationship("ContractDocument", back_populates="contractor", cascade="all, delete-orphan")
     work_updates = relationship("WorkUpdate", back_populates="contractor", cascade="all, delete-orphan")
+    material_bills = relationship("MaterialBill", back_populates="contractor", cascade="all, delete-orphan")
 
 class Contract(Base):
     __tablename__ = "contracts"
@@ -126,6 +127,7 @@ class Contract(Base):
     documents = relationship("ContractDocument", back_populates="contract", cascade="all, delete-orphan")
     complaints = relationship("Complaint", back_populates="contract", cascade="all, delete-orphan")
     work_updates = relationship("WorkUpdate", back_populates="contract", cascade="all, delete-orphan")
+    material_bills = relationship("MaterialBill", back_populates="contract", cascade="all, delete-orphan")
 
 class ContractDocument(Base):
     __tablename__ = "contract_documents"
@@ -316,4 +318,26 @@ class WorkUpdate(Base):
 
     contract = relationship("Contract", back_populates="work_updates")
     contractor = relationship("Contractor", back_populates="work_updates")
+
+class MaterialBill(Base):
+    __tablename__ = "material_bills"
+
+    id = Column(Integer, primary_key=True, index=True)
+    contract_id = Column(Integer, ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False)
+    contractor_id = Column(Integer, ForeignKey("contractors.id", ondelete="CASCADE"), nullable=False)
+
+    bill_number = Column(String(100), nullable=False)
+    supplier_name = Column(String(255), nullable=False)
+    material_description = Column(Text, nullable=False)
+    amount = Column(Float, nullable=False, default=0.0)
+    bill_date = Column(String(20), nullable=False)
+    bill_file_path = Column(String(500), nullable=False)
+    file_name = Column(String(255), nullable=True)
+    file_size = Column(Integer, nullable=True)
+    mime_type = Column(String(100), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    contract = relationship("Contract", back_populates="material_bills")
+    contractor = relationship("Contractor", back_populates="material_bills")
 

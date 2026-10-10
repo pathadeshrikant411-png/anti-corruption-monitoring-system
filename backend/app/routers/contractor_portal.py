@@ -6,14 +6,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Form, File, Upload
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Contractor, Contract, ContractDocument, ContractFinancial, FundRelease, Payment, WorkUpdate
+from app.models import Contractor, Contract, ContractDocument, ContractFinancial, FundRelease, Payment, WorkUpdate, MaterialBill
 from app.schemas import (
     ContractorDashboardDataResponse,
     ContractorResponse,
     ContractResponse,
     DocumentResponse,
     ContractorFinancialSummary,
-    WorkUpdateResponse
+    WorkUpdateResponse,
+    MaterialBillResponse
 )
 from app.deps import get_current_contractor
 from app.config import settings
@@ -163,4 +164,88 @@ def post_contractor_work_update(
     db.refresh(contract)
 
     return WorkUpdateResponse.model_validate(work_update)
+
+@router.post("/contracts/{contract_id}/material-bills", response_model=MaterialBillResponse)
+def upload_contractor_material_bill(
+    contract_id: int,
+    bill_number: str = Form(...),
+    supplier_name: str = Form(...),
+    material_description: str = Form(...),
+    amount: float = Form(...),
+    bill_date: str = Form(...),
+    file: UploadFile = File(...),
+    contractor: Contractor = Depends(get_current_contractor),
+    db: Session = Depends(get_db)
+):
+    """Allow contractor to permanently upload material purchase bills/invoices."""
+    contract = db.query(Contract).filter(
+        Contract.id == contract_id,
+        Contract.contractor_id == contractor.id
+    ).first()
+
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found or not assigned to your contractor account.")
+
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="Please upload a valid bill file (PDF, JPG, or PNG).")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    allowed_exts = [".pdf", ".jpg", ".jpeg", ".png", ".webp"]
+    if ext not in allowed_exts:
+        raise HTTPException(status_code=400, detail=f"Bill file type {ext} not allowed. Allowed formats: PDF, JPG, PNG, WEBP.")
+
+    upload_dir = os.path.join(settings.UPLOAD_DIR, "material_bills")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    unique_filename = f"BILL_{contract.contract_id}_{uuid.uuid4().hex[:8]}_{int(datetime.now().timestamp())}{ext}"
+    full_path = os.path.join(upload_dir, unique_filename)
+
+    file_content = file.file.read()
+    file_size = len(file_content)
+
+    with open(full_path, "wb") as f:
+        f.write(file_content)
+
+    bill_rel_path = f"/api/public/uploads/material_bills/{unique_filename}"
+
+    material_bill = MaterialBill(
+        contract_id=contract.id,
+        contractor_id=contractor.id,
+        bill_number=bill_number.strip(),
+        supplier_name=supplier_name.strip(),
+        material_description=material_description.strip(),
+        amount=max(0.0, float(amount)),
+        bill_date=bill_date.strip(),
+        bill_file_path=bill_rel_path,
+        file_name=file.filename,
+        file_size=file_size,
+        mime_type=file.content_type or ("application/pdf" if ext == ".pdf" else "image/jpeg")
+    )
+
+    db.add(material_bill)
+    db.commit()
+    db.refresh(material_bill)
+
+    return MaterialBillResponse.model_validate(material_bill)
+
+@router.get("/contracts/{contract_id}/material-bills", response_model=List[MaterialBillResponse])
+def get_contractor_material_bills(
+    contract_id: int,
+    contractor: Contractor = Depends(get_current_contractor),
+    db: Session = Depends(get_db)
+):
+    """Retrieve all material bills uploaded for this contract."""
+    contract = db.query(Contract).filter(
+        Contract.id == contract_id,
+        Contract.contractor_id == contractor.id
+    ).first()
+
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found or not assigned to your contractor account.")
+
+    bills = db.query(MaterialBill).filter(
+        MaterialBill.contract_id == contract.id
+    ).order_by(MaterialBill.bill_date.desc(), MaterialBill.created_at.desc()).all()
+
+    return [MaterialBillResponse.model_validate(b) for b in bills]
 

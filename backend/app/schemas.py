@@ -62,16 +62,16 @@ class ForgotPasswordResponse(BaseModel):
 # Contractor Phase 1 Schemas
 class ContractorRegistrationRequest(BaseModel):
     first_name: str
-    fathers_name: str
-    surname: str
+    fathers_name: Optional[str] = ""
+    surname: Optional[str] = ""
     mobile_number: str
     email: EmailStr
     contractor_reg_number: str
     company_name: Optional[str] = None
-    business_address: str
-    state: str
-    district: str
-    pin_code: str
+    business_address: Optional[str] = ""
+    state: Optional[str] = "Maharashtra"
+    district: Optional[str] = "Mumbai"
+    pin_code: Optional[str] = ""
     photo_path: Optional[str] = None
     password: str = Field(..., min_length=6)
     confirm_password: str = Field(..., min_length=6)
@@ -79,52 +79,52 @@ class ContractorRegistrationRequest(BaseModel):
 
 # Contract Creation Schema (Phase 2 Expanded)
 class ContractCreateRequest(BaseModel):
-    title: str
-    department: str
-    office_name: str
-    location: str
+    title: str = "Civil Works Project"
+    department: str = "Public Works Department (PWD)"
+    office_name: Optional[str] = "Executive Engineer Office"
+    location: Optional[str] = ""
     contract_address: Optional[str] = None
-    district: str
-    state: str
+    district: Optional[str] = "Mumbai"
+    state: Optional[str] = "Maharashtra"
     pin_code: Optional[str] = None
-    contract_type: str
-    description: str
-    tender_number: str
-    work_order_number: str
-    agreement_number: str
-    start_date: str
-    end_date: str
-    responsibilities: str
+    contract_type: Optional[str] = "Road Construction"
+    description: Optional[str] = ""
+    tender_number: Optional[str] = ""
+    work_order_number: Optional[str] = ""
+    agreement_number: Optional[str] = ""
+    start_date: Optional[str] = ""
+    end_date: Optional[str] = ""
+    responsibilities: Optional[str] = ""
     status: str = "Awarded"
     progress_percentage: int = 0
 
 # Financial Specs & Transactions Schemas (Phase 3)
 class FundReleaseCreateRequest(BaseModel):
-    installment_number: int
-    release_order_number: str
-    release_date: str
-    amount_released: float
-    payment_ref_number: str
+    installment_number: int = 1
+    release_order_number: Optional[str] = ""
+    release_date: Optional[str] = ""
+    amount_released: float = 0.0
+    payment_ref_number: Optional[str] = ""
     remarks: Optional[str] = None
 
 class PaymentCreateRequest(BaseModel):
-    payment_date: str
-    gross_amount: float
+    payment_date: Optional[str] = ""
+    gross_amount: float = 0.0
     deductions: float = 0.0
-    net_amount: float
-    payment_ref_number: str
+    net_amount: float = 0.0
+    payment_ref_number: Optional[str] = ""
     payment_status: str = "Paid"
     remarks: Optional[str] = None
 
 class ContractFinancialCreateRequest(BaseModel):
-    sanctioned_amount: float
+    sanctioned_amount: float = 0.0
     sanctioned_amount_words: Optional[str] = None
-    sanctioning_authority: str
-    sanction_order_number: str
-    sanction_date: str
-    financial_year: str
+    sanctioning_authority: Optional[str] = "Department Authority"
+    sanction_order_number: Optional[str] = "SO-2026-001"
+    sanction_date: Optional[str] = ""
+    financial_year: Optional[str] = "2025-2026"
     budget_head: Optional[str] = None
-    contract_value: float
+    contract_value: float = 0.0
     approved_variations: float = 0.0
     revised_contract_value: float = 0.0
     deductions_terms: Optional[str] = None

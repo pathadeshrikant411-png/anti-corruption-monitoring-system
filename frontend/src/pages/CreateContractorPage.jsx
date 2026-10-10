@@ -287,7 +287,11 @@ const CreateContractorPage = () => {
 
     const payload = {
       contractor: regData,
-      contracts: contracts.map(({ id, ...rest }) => rest),
+      contracts: contracts.map(({ id, ...rest }) => ({
+        ...rest,
+        description: (rest.description || rest.responsibilities || rest.title || 'Official Government Contract').trim(),
+        responsibilities: (rest.responsibilities || rest.description || rest.title || 'Official Contractor Responsibilities').trim()
+      })),
       financials: {
         sanctioned_amount: sanctionedAmt,
         sanctioned_amount_words: financials.sanctioned_amount_words,
@@ -316,7 +320,12 @@ const CreateContractorPage = () => {
     };
 
     try {
-      const response = await api.post('/contractors', payload);
+      const adminToken = localStorage.getItem('admin_access_token') || localStorage.getItem('anti_corruption_token');
+      const authHeaders = adminToken ? { Authorization: `Bearer ${adminToken}` } : {};
+
+      const response = await api.post('/contractors', payload, {
+        headers: { ...authHeaders }
+      });
       const createdContractorId = response.data.id;
 
       // Upload Official Contractor Photo if provided
@@ -324,7 +333,10 @@ const CreateContractorPage = () => {
         const photoFormData = new FormData();
         photoFormData.append('file', photoFile);
         await api.post(`/contractors/${createdContractorId}/photo`, photoFormData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            ...authHeaders
+          }
         });
       }
 
@@ -342,18 +354,25 @@ const CreateContractorPage = () => {
           formData.append('file', doc.file);
 
           await api.post(`/contractors/${createdContractorId}/documents`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              ...authHeaders
+            }
           });
         }
       }
 
-      const contractorName = `${regData.first_name} ${regData.surname}`.trim() || regData.company_name || 'Contractor';
+      const contractorName = `${regData.first_name} ${regData.fathers_name ? `${regData.fathers_name} ` : ''}${regData.surname}`.trim() || regData.company_name || 'Contractor';
       const profileDetails = {
+        id: response.data.id,
         contractor_id: response.data.contractor_id || createdContractorId,
         name: contractorName,
         company_name: regData.company_name,
         email: regData.email,
+        mobile_number: regData.mobile_number,
+        contractor_reg_number: regData.contractor_reg_number,
         status: response.data.status || 'Active',
+        contracts_count: response.data.contracts?.length || contracts.length,
         is_draft: isDraft
       };
 
@@ -371,6 +390,53 @@ const CreateContractorPage = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCreateAnother = () => {
+    setCreatedProfile(null);
+    setFormSuccess(null);
+    setFormError(null);
+    setActivePhase(1);
+    setReviewConfirmed(false);
+    setRegData({
+      first_name: '',
+      fathers_name: '',
+      surname: '',
+      mobile_number: '',
+      email: '',
+      contractor_reg_number: '',
+      company_name: '',
+      business_address: '',
+      state: 'Maharashtra',
+      district: 'Mumbai',
+      pin_code: '',
+      password: '',
+      confirm_password: '',
+      status: 'Active'
+    });
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setContracts([
+      {
+        id: Date.now(),
+        title: '',
+        department: 'Public Works Department (PWD)',
+        office_name: 'Executive Engineer Division Office',
+        location: '',
+        contract_address: '',
+        district: 'Mumbai',
+        state: 'Maharashtra',
+        pin_code: '',
+        contract_type: 'Road Construction',
+        tender_number: '',
+        work_order_number: '',
+        agreement_number: '',
+        start_date: '',
+        end_date: '',
+        responsibilities: ''
+      }
+    ]);
+    setAttachedDocs([]);
   };
 
   return (
@@ -1478,27 +1544,62 @@ const CreateContractorPage = () => {
                   </div>
                 )}
 
-                <div className="flex justify-between items-center">
+                {createdProfile.contractor_reg_number && (
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                    <span className="text-slate-500 font-semibold">Government Reg #:</span>
+                    <span className="font-mono font-semibold text-slate-800">{createdProfile.contractor_reg_number}</span>
+                  </div>
+                )}
+
+                {createdProfile.mobile_number && (
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                    <span className="text-slate-500 font-semibold">Mobile Number:</span>
+                    <span className="font-mono text-slate-800">{createdProfile.mobile_number}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                   <span className="text-slate-500 font-semibold">Registered Email:</span>
                   <span className="font-mono text-slate-800">{createdProfile.email}</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-semibold">Assigned Work Orders:</span>
+                  <span className="font-bold text-gov-700">{createdProfile.contracts_count || 1} Work Orders Configured</span>
                 </div>
               </div>
 
               <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-emerald-900 leading-relaxed font-medium">
                 <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 <span>
-                  Confirmation: The contractor can now log in to the Contractor Portal using their registered credentials.
+                  Confirmation: The contractor profile is permanently preserved and can now log in to the Contractor Portal with their registered credentials.
                 </span>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-2">
                 <button
                   type="button"
-                  onClick={() => navigate('/admin/contractors')}
-                  className="px-5 py-2.5 bg-gov-700 hover:bg-gov-800 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                  onClick={handleCreateAnother}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
                 >
-                  Go to Contractor List
+                  Create Another Profile
                 </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/dashboard')}
+                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                  >
+                    Executive Dashboard
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/admin/contractors')}
+                    className="px-5 py-2.5 bg-gov-700 hover:bg-gov-800 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                  >
+                    View in Directory
+                  </button>
+                </div>
               </div>
             </div>
           </div>

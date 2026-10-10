@@ -33,11 +33,49 @@ const processQueue = (queue, error, token = null) => {
   });
 };
 
+// Accurately determine whether a request belongs to the Contractor Portal
+export const isContractorPortalRequest = (url = '') => {
+  const cleanUrl = (url || '').toLowerCase();
+
+  // IMPORTANT: Any endpoint starting with /contractors or /api/contractors (plural)
+  // is strictly the Administration Contractor Management Router!
+  // (e.g., POST /contractors, GET /contractors, /contractors/:id, /contractors/complaints, etc.)
+  if (
+    cleanUrl.startsWith('/contractors') ||
+    cleanUrl.startsWith('/api/contractors')
+  ) {
+    return false;
+  }
+
+  // Contractor Portal endpoints are singular:
+  // e.g., /contractor/profile, /contractor/contracts, /contractor/change-password, or /auth/contractor-login
+  if (
+    cleanUrl.startsWith('/contractor/') ||
+    cleanUrl.startsWith('/api/contractor/') ||
+    cleanUrl === '/contractor' ||
+    cleanUrl === '/api/contractor' ||
+    cleanUrl.includes('/auth/contractor-')
+  ) {
+    return true;
+  }
+
+  // Fallback to active browser page location if URL does not specify
+  if (typeof window !== 'undefined') {
+    const currentPath = (window.location.pathname || '').toLowerCase();
+    if (currentPath.startsWith('/contractor')) {
+      return true;
+    }
+    if (currentPath.startsWith('/admin') || currentPath.startsWith('/dashboard') || currentPath === '/login') {
+      return false;
+    }
+  }
+
+  return false;
+};
+
 // Determine which token to attach based on request URL and window location
 const resolveTokenForRequest = (url = '') => {
-  const isContractorTarget =
-    url.includes('/contractor') ||
-    (typeof window !== 'undefined' && window.location.pathname.startsWith('/contractor'));
+  const isContractorTarget = isContractorPortalRequest(url);
 
   if (isContractorTarget) {
     const contractorToken = localStorage.getItem(CONTRACTOR_TOKEN_KEY);
@@ -48,15 +86,17 @@ const resolveTokenForRequest = (url = '') => {
   }
 
   // Fallback if portal-specific token not found
-  const fallbackAdmin = localStorage.getItem(ADMIN_TOKEN_KEY);
-  if (fallbackAdmin && !isContractorTarget) return { token: fallbackAdmin, portal: 'admin' };
-
-  const fallbackContractor = localStorage.getItem(CONTRACTOR_TOKEN_KEY);
-  if (fallbackContractor && isContractorTarget) return { token: fallbackContractor, portal: 'contractor' };
+  if (isContractorTarget) {
+    const fallbackContractor = localStorage.getItem(CONTRACTOR_TOKEN_KEY);
+    if (fallbackContractor) return { token: fallbackContractor, portal: 'contractor' };
+  } else {
+    const fallbackAdmin = localStorage.getItem(ADMIN_TOKEN_KEY) || localStorage.getItem('anti_corruption_token');
+    if (fallbackAdmin) return { token: fallbackAdmin, portal: 'admin' };
+  }
 
   // Legacy key check if migration in progress
   const legacyToken = localStorage.getItem('anti_corruption_token');
-  if (legacyToken) return { token: legacyToken, portal: 'legacy' };
+  if (legacyToken) return { token: legacyToken, portal: isContractorTarget ? 'contractor' : 'admin' };
 
   return { token: null, portal: null };
 };
@@ -103,9 +143,7 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      const isContractorRequest =
-        url.includes('/contractor') ||
-        (typeof window !== 'undefined' && window.location.pathname.startsWith('/contractor'));
+      const isContractorRequest = isContractorPortalRequest(url);
 
       const storageTokenKey = isContractorRequest ? CONTRACTOR_TOKEN_KEY : ADMIN_TOKEN_KEY;
       const storageUserKey = isContractorRequest ? CONTRACTOR_USER_KEY : ADMIN_USER_KEY;
